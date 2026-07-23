@@ -4,25 +4,45 @@ from __future__ import annotations
 
 import polars as pl
 
-from .config import MEASUREMENT_AREA
+from .config import MEASUREMENT_AREA, PROCESS_AREA
 from .data import fetch
 from .normalise import is_abbreviation, normalise
 
 
-def load_diseases(drop_measurements: bool = True) -> pl.DataFrame:
-    """Load the disease dataset, excluding measurement terms by default.
+def load_diseases(
+    drop_measurements: bool = True, drop_processes: bool = True
+) -> pl.DataFrame:
+    """Load the disease dataset, excluding non-disease terms by default.
 
-    The dataset carries the whole of EFO, and 53% of its rows sit under the
-    measurement therapeutic area: GWAS traits such as "Increased circulating
-    ACTH level". They are not diseases, and their vocabulary (level, serum,
-    protein, ratio) would dominate any index built over the raw table.
+    The dataset carries the whole of EFO. Two branches are not diseases and are
+    removed so they cannot become match targets:
+
+    - measurement (53% of rows): GWAS traits such as "Increased circulating
+      ACTH level", whose vocabulary (level, serum, ratio) would dominate the
+      index.
+    - biological_process (735 rows): "cell cycle", "metabolic process",
+      "transport", which match pathway labels freely for the wrong reason.
     """
     diseases = fetch("disease")
     if drop_measurements:
         diseases = diseases.filter(
             ~pl.col("therapeuticAreas").list.contains(MEASUREMENT_AREA)
         )
+    if drop_processes:
+        diseases = diseases.filter(
+            ~pl.col("therapeuticAreas").list.contains(PROCESS_AREA)
+        )
     return diseases
+
+
+def gene_symbols() -> set[str]:
+    """Return approved gene symbols, lowercased.
+
+    Used to reject distinctive-token aliases that are really gene symbols
+    (`AMN`, `KIT`, `FLT3`), the main source of spurious acronym matches.
+    """
+    symbols = fetch("target", columns=["approvedSymbol"])
+    return set(symbols["approvedSymbol"].str.to_lowercase().to_list())
 
 
 def surface_forms(diseases: pl.DataFrame) -> pl.DataFrame:

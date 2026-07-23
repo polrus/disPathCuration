@@ -73,21 +73,49 @@ python scripts/build_disease_index.py
 ```
 
 This writes `disease_surface_forms.parquet` and `disease_chunks.parquet` under
-`data/<release>/`.
+`data/<release>/`. Full detail is in [docs/chunking.md](docs/chunking.md).
+
+## Matching
+
+Three complementary extractors turn chunks into pathway-disease matches, in order of
+precedence:
+
+- **template**: the disease slot of a "causes" label (`Defective ABCC6 causes PXE`), which
+  licenses acronyms the structure proves are diseases.
+- **whole_form**: a complete disease name or exact synonym found as a token span. Fragments
+  are never matched.
+- **alias**: a distinctive single disease token (`HIV`), hard filtered against gene symbols,
+  generic terms and short acronyms. The lowest-confidence method, flagged for review.
+
+Global abbreviation matching is deliberately excluded: it recovered 10 curated links while
+adding 61 acronym collisions. Full detail, filters and examples are in
+[docs/matching.md](docs/matching.md).
+
+```
+python scripts/run_matcher.py
+```
+
+## Recovery against curated evidence
+
+The Reactome evidence is treated as a recall floor, not a ceiling: the project premise is that
+it is incomplete. Of its 653 curated pathway-disease pairs, the matcher recovers 122 (18.7%),
+of which 28 resolve a more specific disease than the curator recorded. The low figure is a
+property of the evidence, not the method: 450 of the not-recovered pairs sit on pathways whose
+label does not name the disease at all, so no label-based method can reach them.
+
+The matcher also produces two actionable outputs: 263 new candidate links absent from the
+evidence, and the specificity improvements where the label names a subtype the curation
+recorded only as a parent.
 
 ## Approach status
 
 | Step | State |
 | --- | --- |
 | 1. Parse diseases into scored chunks | done |
-| 2. Load pathway and process labels | reactome downloaded |
-| 3. Match chunks against labels | next |
-| 4. Compare against evidence, per gap type | not started |
-| 5. Package as a pipeline | not started |
-
-Steps 4 measures the two gap types separately: the mapping gap (Reactome annotated a disease
-string that OT did not map to EFO) and the annotation gap (Reactome never annotated the
-pathway, though its label names a disease).
+| 2. Load pathway and process labels | done |
+| 3. Match chunks against labels | done |
+| 4. Compare against evidence, per reason | done |
+| 5. Package as a pipeline | partial |
 
 ## Development
 

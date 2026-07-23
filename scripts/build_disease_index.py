@@ -20,9 +20,12 @@ from dispathcuration.diseases import load_diseases, surface_forms  # noqa: E402
 
 
 def main() -> None:
-    raw = load_diseases(drop_measurements=False)
+    raw = load_diseases(drop_measurements=False, drop_processes=False)
     diseases = load_diseases()
-    print(f"diseases: {diseases.height} of {raw.height} after dropping measurements")
+    print(
+        f"diseases: {diseases.height} of {raw.height} "
+        f"after dropping measurement and biological_process terms"
+    )
 
     surface = surface_forms(diseases)
     print(
