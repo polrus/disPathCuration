@@ -39,10 +39,24 @@ watching each release.
 
 ## LLM judge for context false positives
 
-Designed, not built. The judge removes matches where a disease token appears in the label for
-a reason unrelated to the disease: "shock" as a verb, "hypoxia" as a cellular condition rather
-than the disease, an acronym that means a protein domain here. These are linguistic false
-positives the deterministic matcher cannot see, because it has no context model.
+Built (`src/dispathcuration/judge.py`, `scripts/run_judge.py`). The judge removes matches where
+a disease token appears in the label for a reason unrelated to the disease: "hypoxia" as a
+cellular condition rather than the disease, "dependence" as a receptor property, an acronym
+that means a protein here. These are linguistic false positives the deterministic matcher
+cannot see, because it has no context model.
+
+On release 26.06 it rejected 13 of the 151 low-confidence candidates, including `hypoxia` in
+"Cellular response to hypoxia", `dependence` in "Dependence Receptors", and `viral infection`
+in "Viral Infection Pathways".
+
+### Backend: Claude Code, no API key
+
+`claude_code_backend` shells out to the Claude Code CLI in print mode
+(`claude -p --model <model> --output-format json`), which uses the user's existing Claude Code
+login. No ANTHROPIC_API_KEY is required. The backend is a single function passed into
+`judge_matches`, so a direct Anthropic API call can replace it later without touching the rest
+of the module. The default model is Haiku, which keeps the small tier cheap; Opus judges more
+strictly and can be passed with `--model opus`.
 
 ### Shape: an annotating filter, not a matcher
 
@@ -66,7 +80,7 @@ Per candidate the judge receives:
 - the matched disease name,
 - the exact span in the label that matched.
 
-It returns, via structured output at temperature 0:
+Candidates are sent in batches, and the judge returns a JSON array, one object per item:
 
 - `verdict`: `keep` or `reject`,
 - `reason`: one clause, for audit.

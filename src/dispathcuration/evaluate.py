@@ -97,6 +97,45 @@ def recovery_report(
     return {"counts": dict(counts), "detail": dict(detail)}
 
 
+def specificity_fix_table(
+    matches: pl.DataFrame,
+    evidence_reactome: pl.DataFrame,
+    diseases: pl.DataFrame,
+) -> pl.DataFrame:
+    """Rows where the matcher resolved a more specific disease than the curation.
+
+    One row per (pathway, matcher disease, curated parent), so a reviewer sees
+    the label, the precise disease the matcher found, and the broader disease the
+    curation recorded.
+    """
+    ancestors, _ = _ancestry(diseases)
+    names = dict(zip(diseases["id"], diseases["name"], strict=True))
+    pairs = evidence_pairs(evidence_reactome)
+
+    curated_by_pathway: dict[str, set[str]] = defaultdict(set)
+    for pathway_id, disease_id in zip(
+        pairs["pathwayId"], pairs["diseaseId"], strict=True
+    ):
+        curated_by_pathway[pathway_id].add(disease_id)
+
+    rows = []
+    for row in matches.iter_rows(named=True):
+        for curated in curated_by_pathway.get(row["pathwayId"], set()):
+            if curated in ancestors.get(row["diseaseId"], set()):
+                rows.append(
+                    {
+                        "pathwayId": row["pathwayId"],
+                        "pathwayLabel": row["pathwayLabel"],
+                        "method": row["method"],
+                        "matcherDiseaseId": row["diseaseId"],
+                        "matcherDisease": names.get(row["diseaseId"], ""),
+                        "curatedDiseaseId": curated,
+                        "curatedDisease": names.get(curated, ""),
+                    }
+                )
+    return pl.DataFrame(rows)
+
+
 def non_recovery_reasons(
     matches: pl.DataFrame,
     evidence_reactome: pl.DataFrame,

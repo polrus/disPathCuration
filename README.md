@@ -76,18 +76,31 @@ flowchart TD
     EVR --> NR
     EVR --> NV
 
-    M -. planned .-> J["LLM judge<br/>annotate low-confidence tier"]
-    R --> OUT["outputs:<br/>new candidates + specificity fixes"]
+    M --> J["LLM judge<br/>annotate low-confidence tier"]
+    J --> OUT["outputs (CSV):<br/>new candidates + specificity fixes"]
     NV --> OUT
-    J -. planned .-> OUT
-
-    classDef plan stroke-dasharray:5 5;
-    class J plan;
+    R --> OUT
 ```
 
 The `template` extractor and the evidence comparison are Reactome-specific; the chunk index,
-`whole_form`, `alias` and the planned judge are source-agnostic. Design notes for the judge
-and for unattended per-release runs are in [docs/pipeline.md](docs/pipeline.md).
+`whole_form`, `alias` and the judge are source-agnostic. Design notes and the release-automation
+checklist are in [docs/pipeline.md](docs/pipeline.md).
+
+## Verification and outputs
+
+An optional LLM judge removes context false positives that the deterministic matcher cannot
+see: `hypoxia` in "Cellular response to hypoxia", `dependence` in "Dependence Receptors". It
+annotates the low-confidence tier (`alias` and low-specificity `whole_form`) with a keep or
+reject verdict; it never deletes rows and never sees the structurally certain `template`
+matches. On release 26.06 it rejected 13 of 151 candidates.
+
+The judge needs no `ANTHROPIC_API_KEY`: by default it calls the Claude Code CLI in print mode,
+using the existing Claude Code login. See [docs/pipeline.md](docs/pipeline.md).
+
+```
+python scripts/run_matcher.py   # writes matches.csv, new_candidates.csv, specificity_fixes.csv
+python scripts/run_judge.py     # writes matches_judged.csv with keep/reject verdicts
+```
 
 ## Data sources
 

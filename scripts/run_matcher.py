@@ -16,7 +16,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from dispathcuration.config import DATA_DIR  # noqa: E402
 from dispathcuration.data import fetch  # noqa: E402
 from dispathcuration.diseases import gene_symbols, load_diseases  # noqa: E402
-from dispathcuration.evaluate import novelty_report, recovery_report  # noqa: E402
+from dispathcuration.evaluate import (  # noqa: E402
+    evidence_pairs,
+    novelty_report,
+    recovery_report,
+    specificity_fix_table,
+)
 from dispathcuration.matcher import build_matcher  # noqa: E402
 
 
@@ -29,6 +34,7 @@ def main() -> None:
     matcher = build_matcher(chunks, gene_symbols())
     matches = matcher.match_all(reactome)
     matches.write_parquet(DATA_DIR / "matches.parquet")
+    matches.write_csv(DATA_DIR / "matches.csv")
 
     print("=== matcher output ===")
     print(f"pathway-disease pairs : {matches.height}")
@@ -52,6 +58,23 @@ def main() -> None:
     print("\n=== new candidate pairs (absent from evidence) ===")
     print(f"new pairs              : {novelty['new_pairs']}")
     print(novelty["by_method"])
+
+    # Two actionable tables as CSV, for review.
+    disease_names = dict(zip(diseases["id"], diseases["name"], strict=True))
+    labelled = matches.with_columns(
+        pl.col("diseaseId").replace_strict(disease_names, default="").alias("diseaseName")
+    )
+    pairs = evidence_pairs(evidence)
+    curated = set(zip(pairs["pathwayId"], pairs["diseaseId"], strict=True))
+    is_new = pl.struct("pathwayId", "diseaseId").map_elements(
+        lambda s: (s["pathwayId"], s["diseaseId"]) not in curated, return_dtype=pl.Boolean
+    )
+    labelled.filter(is_new).write_csv(DATA_DIR / "new_candidates.csv")
+
+    specificity_fix_table(matches, evidence, diseases).write_csv(
+        DATA_DIR / "specificity_fixes.csv"
+    )
+    print("\nwrote CSV: matches.csv, new_candidates.csv, specificity_fixes.csv")
 
 
 if __name__ == "__main__":
