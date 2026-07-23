@@ -29,6 +29,66 @@ The hypothesis is untested. Step 4 below is what decides it.
 5. **Pipeline.** Package the extraction so candidates can be regenerated when the ontology
    or the facets file changes.
 
+## Pipeline
+
+```mermaid
+flowchart TD
+    subgraph inputs["Open Targets Platform, release 26.06"]
+        DIS["disease dataset<br/>EFO/MONDO"]
+        TGT["target dataset<br/>gene symbols"]
+        RXL["reactome dataset<br/>pathway labels"]
+        EVR["evidence_reactome<br/>curated links"]
+    end
+
+    subgraph index["Disease chunk index (build_disease_index.py)"]
+        LD["load_diseases<br/>drop measurement EFO_0001444<br/>drop process GO_0008150"]
+        SF["surface_forms<br/>name + exact synonyms, normalised"]
+        CH["chunks<br/>specificity, coverage, sharing"]
+        LD --> SF --> CH
+    end
+    DIS --> LD
+
+    subgraph matcher["Matcher (run_matcher.py), precedence template &gt; whole_form &gt; alias"]
+        T["template<br/>Defective GENE causes DISEASE"]
+        W["whole_form<br/>full name or synonym span"]
+        A["alias<br/>distinctive token, gene-symbol filtered"]
+    end
+    CH --> T
+    CH --> W
+    CH --> A
+    TGT --> A
+    RXL --> T
+    RXL --> W
+    RXL --> A
+    T --> M["matches<br/>pathway-disease pairs"]
+    W --> M
+    A --> M
+
+    subgraph eval["Evaluation (evaluate.py), evidence as recall floor"]
+        R["recovery<br/>exact / more-specific / more-general"]
+        NR["non-recovery reasons"]
+        NV["new candidate links"]
+    end
+    M --> R
+    M --> NR
+    M --> NV
+    EVR --> R
+    EVR --> NR
+    EVR --> NV
+
+    M -. planned .-> J["LLM judge<br/>annotate low-confidence tier"]
+    R --> OUT["outputs:<br/>new candidates + specificity fixes"]
+    NV --> OUT
+    J -. planned .-> OUT
+
+    classDef plan stroke-dasharray:5 5;
+    class J plan;
+```
+
+The `template` extractor and the evidence comparison are Reactome-specific; the chunk index,
+`whole_form`, `alias` and the planned judge are source-agnostic. Design notes for the judge
+and for unattended per-release runs are in [docs/pipeline.md](docs/pipeline.md).
+
 ## Data sources
 
 Release 26.06 is pinned. The `latest` symlink currently points at a run whose manifest
