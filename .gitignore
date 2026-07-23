@@ -219,3 +219,6 @@ __marimo__/
 
 # Claude Code
 .claude/
+
+# Downloaded Open Targets data
+data/
