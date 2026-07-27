@@ -28,9 +28,10 @@ from collections.abc import Callable
 
 import polars as pl
 
-# Haiku by default: the tier is small and this keeps cost low. Opus judges more
-# strictly (it rejects borderline cases Haiku keeps) and can be passed instead.
-DEFAULT_MODEL = "haiku"
+# Sonnet by default: a stronger judge than Haiku for the borderline word-sense
+# calls this tier is full of, at moderate cost. Pass "haiku" for a cheaper run
+# or "opus" for the strictest.
+DEFAULT_MODEL = "sonnet"
 DEFAULT_BATCH_SIZE = 25
 LOW_CONFIDENCE_MAX_SPECIFICITY = 12.0
 

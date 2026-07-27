@@ -55,8 +55,9 @@ in "Viral Infection Pathways".
 (`claude -p --model <model> --output-format json`), which uses the user's existing Claude Code
 login. No ANTHROPIC_API_KEY is required. The backend is a single function passed into
 `judge_matches`, so a direct Anthropic API call can replace it later without touching the rest
-of the module. The default model is Haiku, which keeps the small tier cheap; Opus judges more
-strictly and can be passed with `--model opus`.
+of the module. The default model is Sonnet (latest), a stronger judge than Haiku for the
+borderline word-sense calls this tier is full of; pass `--model haiku` for a cheaper run or
+`--model opus` for the strictest.
 
 ### Shape: an annotating filter, not a matcher
 
@@ -94,8 +95,8 @@ text mean something else here? It is told to judge language only, not pathway bi
 - Results are cached keyed on a hash of `(pathway label, disease id, matched span)`. Unchanged
   pairs cost nothing on re-run, and the annotated output is stable across releases except where
   a label or match actually changed.
-- Model choice is a cost decision made at build time. The tier is small, so a fast model
-  (Claude Haiku 4.5) is the default; a stronger model can be swapped in for a sampled audit.
+- Model choice trades cost against judgement quality. Sonnet (latest) is the default; Haiku is
+  cheaper for a quick pass and Opus is the strictest for a sampled audit.
 
 ### Validating the judge itself
 

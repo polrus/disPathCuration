@@ -29,7 +29,9 @@ from dispathcuration.judge import (  # noqa: E402
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--source", default="reactome", help="reactome (default) or go")
-    parser.add_argument("--model", default=DEFAULT_MODEL, help="haiku (default) or opus")
+    parser.add_argument(
+        "--model", default=DEFAULT_MODEL, help="sonnet (default), haiku, or opus"
+    )
     args = parser.parse_args()
 
     matches = pl.read_parquet(DATA_DIR / f"matches_{args.source}.parquet")
