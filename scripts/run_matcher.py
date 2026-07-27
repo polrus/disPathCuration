@@ -1,11 +1,17 @@
-"""Run the matcher over Reactome labels and report recovery against evidence.
+"""Run the matcher over a label source and report results.
 
-Usage:  python scripts/run_matcher.py
-Writes: data/<release>/matches.parquet
+Usage:  python scripts/run_matcher.py [--source reactome|go]
+Writes: data/<release>/matches_<source>.parquet and .csv, plus, when the source
+        has a curated baseline, new_candidates_<source>.csv and
+        specificity_fixes_<source>.csv.
+
+Reactome is evaluated against evidence_reactome. GO has no disease baseline, so
+every GO match is reported as a candidate and no recovery is computed.
 """
 
 from __future__ import annotations
 
+import argparse
 import sys
 from pathlib import Path
 
@@ -23,29 +29,16 @@ from dispathcuration.evaluate import (  # noqa: E402
     specificity_fix_table,
 )
 from dispathcuration.matcher import build_matcher  # noqa: E402
+from dispathcuration.sources import get_source  # noqa: E402
 
 
-def main() -> None:
-    chunks = pl.read_parquet(DATA_DIR / "disease_chunks.parquet")
-    reactome = fetch("reactome")
-    evidence = fetch("evidence_reactome")
-    diseases = load_diseases()
-
-    matcher = build_matcher(chunks, gene_symbols())
-    matches = matcher.match_all(reactome)
-    matches.write_parquet(DATA_DIR / "matches.parquet")
-    matches.write_csv(DATA_DIR / "matches.csv")
-
-    print("=== matcher output ===")
-    print(f"pathway-disease pairs : {matches.height}")
-    print(f"distinct pathways     : {matches['pathwayId'].n_unique()}")
-    print(f"distinct diseases     : {matches['diseaseId'].n_unique()}")
-    print("by method:")
-    print(matches["method"].value_counts(sort=True))
+def _evaluate(matches, source, diseases):
+    """Reactome-style evaluation against a curated baseline."""
+    evidence = fetch(source.evidence_dataset)
 
     report = recovery_report(matches, evidence, diseases)
     c = report["counts"]
-    print("\n=== recovery of curated Reactome evidence ===")
+    print("\n=== recovery of curated evidence ===")
     print(f"curated pairs          : {c['total_evidence_pairs']}")
     print(f"  recovered            : {c['recovered']} "
           f"({100 * c['recovered'] / c['total_evidence_pairs']:.1f}%)")
@@ -59,22 +52,61 @@ def main() -> None:
     print(f"new pairs              : {novelty['new_pairs']}")
     print(novelty["by_method"])
 
-    # Two actionable tables as CSV, for review.
-    disease_names = dict(zip(diseases["id"], diseases["name"], strict=True))
-    labelled = matches.with_columns(
-        pl.col("diseaseId").replace_strict(disease_names, default="").alias("diseaseName")
-    )
     pairs = evidence_pairs(evidence)
     curated = set(zip(pairs["pathwayId"], pairs["diseaseId"], strict=True))
     is_new = pl.struct("pathwayId", "diseaseId").map_elements(
         lambda s: (s["pathwayId"], s["diseaseId"]) not in curated, return_dtype=pl.Boolean
     )
-    labelled.filter(is_new).write_csv(DATA_DIR / "new_candidates.csv")
+    return is_new, specificity_fix_table(matches, evidence, diseases)
 
-    specificity_fix_table(matches, evidence, diseases).write_csv(
-        DATA_DIR / "specificity_fixes.csv"
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--source", default="reactome", help="reactome (default) or go")
+    args = parser.parse_args()
+    source = get_source(args.source)
+
+    chunks = pl.read_parquet(DATA_DIR / "disease_chunks.parquet")
+    diseases = load_diseases()
+    disease_names = dict(zip(diseases["id"], diseases["name"], strict=True))
+
+    labels = source.load_labels()
+    matcher = build_matcher(chunks, gene_symbols(), use_templates=source.use_templates)
+    matches = matcher.match_all(labels)
+    matches.write_parquet(DATA_DIR / f"matches_{source.name}.parquet")
+
+    print(f"=== matcher output ({source.name}) ===")
+    print(f"labels matched over    : {labels.height}")
+    print(f"pathway-disease pairs  : {matches.height}")
+    print(f"distinct pathways      : {matches['pathwayId'].n_unique()}")
+    print(f"distinct diseases      : {matches['diseaseId'].n_unique()}")
+    print("by method:")
+    print(matches["method"].value_counts(sort=True))
+
+    labelled = matches.with_columns(
+        pl.col("diseaseId").replace_strict(disease_names, default="").alias("diseaseName")
     )
-    print("\nwrote CSV: matches.csv, new_candidates.csv, specificity_fixes.csv")
+
+    if source.evidence_dataset is not None:
+        is_new, fixes = _evaluate(matches, source, diseases)
+        labelled.write_csv(DATA_DIR / f"matches_{source.name}.csv")
+        labelled.filter(is_new).write_csv(DATA_DIR / f"new_candidates_{source.name}.csv")
+        fixes.write_csv(DATA_DIR / f"specificity_fixes_{source.name}.csv")
+        print(
+            f"\nwrote CSV: matches_{source.name}.csv, "
+            f"new_candidates_{source.name}.csv, specificity_fixes_{source.name}.csv"
+        )
+    else:
+        # No curated baseline: every match is a candidate.
+        print(
+            "\n(no curated disease baseline for this source; "
+            "all matches are candidates, no recovery computed)"
+        )
+        labelled.write_csv(DATA_DIR / f"matches_{source.name}.csv")
+        labelled.write_csv(DATA_DIR / f"new_candidates_{source.name}.csv")
+        print(
+            f"\nwrote CSV: matches_{source.name}.csv, new_candidates_{source.name}.csv"
+        )
 
 
 if __name__ == "__main__":

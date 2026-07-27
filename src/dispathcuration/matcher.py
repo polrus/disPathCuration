@@ -208,10 +208,15 @@ class Matcher:
         whole_form_index: dict[str, frozenset[str]],
         slot_index: dict[str, frozenset[str]],
         alias_index: dict[str, frozenset[str]],
+        use_templates: bool = True,
     ) -> None:
         self.whole_form_index = whole_form_index
         self.slot_index = slot_index
         self.alias_index = alias_index
+        # The template extractor keys off Reactome's "Defective GENE causes
+        # DISEASE" convention. GO labels never match it, so it is switched off
+        # for sources that do not use it.
+        self.use_templates = use_templates
         self._max_form_tokens = max(
             (form.count(" ") + 1 for form in whole_form_index), default=1
         )
@@ -227,13 +232,14 @@ class Matcher:
                     pathway_id, label, disease_id, method, text, ambiguity
                 )
 
-        slot = disease_slot(label)
-        if slot is not None:
-            resolved = resolve_slot(slot, self.slot_index)
-            if resolved is not None:
-                form, ids = resolved
-                for disease_id in ids:
-                    offer(disease_id, "template", form, len(ids))
+        if self.use_templates:
+            slot = disease_slot(label)
+            if slot is not None:
+                resolved = resolve_slot(slot, self.slot_index)
+                if resolved is not None:
+                    form, ids = resolved
+                    for disease_id in ids:
+                        offer(disease_id, "template", form, len(ids))
 
         tokens = normalise(label).split()
         for size in range(min(self._max_form_tokens, len(tokens)), 0, -1):
@@ -275,10 +281,13 @@ class Matcher:
         )
 
 
-def build_matcher(chunks: pl.DataFrame, gene_symbols: set[str]) -> Matcher:
+def build_matcher(
+    chunks: pl.DataFrame, gene_symbols: set[str], use_templates: bool = True
+) -> Matcher:
     """Assemble a Matcher from the disease chunk index and gene symbols."""
     return Matcher(
         build_whole_form_index(chunks),
         build_slot_index(chunks),
         build_alias_index(chunks, gene_symbols),
+        use_templates=use_templates,
     )

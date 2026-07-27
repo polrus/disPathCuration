@@ -98,8 +98,34 @@ The judge needs no `ANTHROPIC_API_KEY`: by default it calls the Claude Code CLI 
 using the existing Claude Code login. See [docs/pipeline.md](docs/pipeline.md).
 
 ```
-python scripts/run_matcher.py   # writes matches.csv, new_candidates.csv, specificity_fixes.csv
-python scripts/run_judge.py     # writes matches_judged.csv with keep/reject verdicts
+python scripts/run_matcher.py --source reactome   # matches_reactome.csv, new_candidates_reactome.csv, ...
+python scripts/run_judge.py   --source reactome   # matches_judged_reactome.csv with keep/reject verdicts
+```
+
+## Sources: Reactome and GO
+
+The pipeline runs over any label source through one abstraction
+([`sources.py`](src/dispathcuration/sources.py)). A source declares where its labels come from,
+whether the Reactome-only `template` extractor applies, where gene membership lives, and whether
+a curated disease baseline exists.
+
+| | Reactome | GO biological_process |
+| --- | --- | --- |
+| Labels | `reactome` dataset | `go`, filtered to non-obsolete biological_process |
+| `template` extractor | yes | no (GO has no "causes" labels) |
+| Gene membership | `target.pathways` | `target.go` (aspect P) |
+| Curated baseline | `evidence_reactome` | none exists |
+| Matches (26.06) | 351 | 165 |
+| Judge rejection rate | 6/151 (4%) | 33/77 (43%) |
+
+GO describes processes, not disease pathways: only 0.3% of its labels carry a disease cue, so it
+yields fewer and noisier matches, and there is no baseline to compute recovery against. The high
+judge rejection rate (`plant-type hypersensitive response`, `cardiac muscle hypertrophy`) shows
+the LLM judge is essential for GO, not optional. Run either source:
+
+```
+python scripts/run_matcher.py --source go
+python scripts/run_judge.py   --source go
 ```
 
 ## Data sources

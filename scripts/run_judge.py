@@ -28,10 +28,11 @@ from dispathcuration.judge import (  # noqa: E402
 
 def main() -> None:
     parser = argparse.ArgumentParser()
+    parser.add_argument("--source", default="reactome", help="reactome (default) or go")
     parser.add_argument("--model", default=DEFAULT_MODEL, help="haiku (default) or opus")
     args = parser.parse_args()
 
-    matches = pl.read_parquet(DATA_DIR / "matches.parquet")
+    matches = pl.read_parquet(DATA_DIR / f"matches_{args.source}.parquet")
     chunks = pl.read_parquet(DATA_DIR / "disease_chunks.parquet")
     diseases = load_diseases()
     disease_names = dict(zip(diseases["id"], diseases["name"], strict=True))
@@ -39,7 +40,7 @@ def main() -> None:
     candidates = select_low_confidence(matches, chunks)
     print(f"low-confidence candidates to judge: {candidates.height} of {matches.height}")
 
-    cache_path = DATA_DIR / "judge_cache.json"
+    cache_path = DATA_DIR / f"judge_cache_{args.source}.json"
     cache = json.loads(cache_path.read_text()) if cache_path.exists() else {}
     before = len(cache)
 
@@ -65,8 +66,8 @@ def main() -> None:
     )
 
     full = pl.concat([high, judged.select(high.columns)], how="vertical")
-    full.write_parquet(DATA_DIR / "matches_judged.parquet")
-    full.write_csv(DATA_DIR / "matches_judged.csv")
+    full.write_parquet(DATA_DIR / f"matches_judged_{args.source}.parquet")
+    full.write_csv(DATA_DIR / f"matches_judged_{args.source}.csv")
 
     kept = full.filter(pl.col("verdict") == "keep")
     rejected = full.filter(pl.col("verdict") == "reject")
