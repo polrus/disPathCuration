@@ -128,6 +128,20 @@ python scripts/run_matcher.py --source go
 python scripts/run_judge.py   --source go
 ```
 
+## Unified output
+
+After running the matcher and judge for each source, `combine.py` merges them into one table:
+
+```
+python scripts/combine.py --sources reactome go   # disease_pathways_all.csv
+```
+
+Every row carries a `source` column (`Reactome_26.06`, `GO_26.06`), the judge `verdict`, and a
+`matchedSynonym` column giving the original disease surface form that fired. The last explains
+otherwise puzzling matches: the GO label `type I hypersensitivity` matches the disease
+`IgE responsiveness, atopic` because `type I hypersensitivity` is one of that disease's exact
+synonyms.
+
 ## Data sources
 
 Release 26.06 is pinned. The `latest` symlink currently points at a run whose manifest

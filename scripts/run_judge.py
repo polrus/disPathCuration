@@ -65,7 +65,9 @@ def main() -> None:
         pl.lit("high-confidence tier, not judged").alias("reason"),
     )
 
-    full = pl.concat([high, judged.select(high.columns)], how="vertical")
+    full = pl.concat([high, judged.select(high.columns)], how="vertical").with_columns(
+        pl.col("diseaseId").replace_strict(disease_names, default="").alias("diseaseName")
+    )
     full.write_parquet(DATA_DIR / f"matches_judged_{args.source}.parquet")
     full.write_csv(DATA_DIR / f"matches_judged_{args.source}.csv")
 

@@ -29,6 +29,7 @@ from dispathcuration.evaluate import (  # noqa: E402
     specificity_fix_table,
 )
 from dispathcuration.matcher import build_matcher  # noqa: E402
+from dispathcuration.output import add_matched_synonym  # noqa: E402
 from dispathcuration.sources import get_source  # noqa: E402
 
 
@@ -67,12 +68,13 @@ def main() -> None:
     source = get_source(args.source)
 
     chunks = pl.read_parquet(DATA_DIR / "disease_chunks.parquet")
+    surface_forms = pl.read_parquet(DATA_DIR / "disease_surface_forms.parquet")
     diseases = load_diseases()
     disease_names = dict(zip(diseases["id"], diseases["name"], strict=True))
 
     labels = source.load_labels()
     matcher = build_matcher(chunks, gene_symbols(), use_templates=source.use_templates)
-    matches = matcher.match_all(labels)
+    matches = add_matched_synonym(matcher.match_all(labels), surface_forms)
     matches.write_parquet(DATA_DIR / f"matches_{source.name}.parquet")
 
     print(f"=== matcher output ({source.name}) ===")
