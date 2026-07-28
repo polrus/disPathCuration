@@ -3,7 +3,7 @@
 A 10-minute talk. Detailed slide-by-slide description with the numbers and examples to use.
 All figures are from Open Targets Platform release 26.06. Build the deck from this later.
 
-Target length: ~11 slides, roughly 1 minute each. Numbers in **bold** are the headline figures
+Target length: ~13 slides, roughly 1 minute each. Numbers in **bold** are the headline figures
 for that slide.
 
 ---
@@ -247,7 +247,116 @@ adding new ones, and it is directly actionable by curators.
 
 ---
 
-## Slide 10 - Conclusion: benefits of integrating this pipeline
+## Slide 10 - Extending to GO biological processes
+
+**Message:** the pipeline runs on GO through the same code, but GO is a different kind of source,
+and the results and applicable steps differ. This is the universality claim, tested.
+
+Numbers:
+- GO biological_process, non-obsolete: **24,136 labels** (of 30,874; ~10k obsolete dropped).
+- Matches: **165 pathway-disease pairs** over **15 distinct diseases** (138 whole_form,
+  27 alias, **0 template**).
+- After the judge (Sonnet): **141 kept, 24 rejected**.
+
+Examples of GO pathways found (show these):
+- `type III hypersensitivity` -> `IgE responsiveness, atopic` (via the exact synonym
+  "type III hypersensitivity"; a good illustration of synonym matching)
+- `granuloma formation` -> `Granuloma`
+- `response to hypoxia` -> `hypoxia`
+- `inflammatory response to antigenic stimulus` -> `inflammation`
+- `reactive gliosis` -> `Gliosis`
+
+Which pipeline parts were NOT used for GO (the Reactome-specific layers):
+- **`template` extractor**: 0 matches. GO has no "Defective GENE causes DISEASE" labels, so the
+  highest-precision extractor does not apply and is switched off.
+- **Recovery / evaluation against curated evidence**: there is **no GO-disease evidence dataset**
+  in Open Targets, so there is no baseline to compute recovery, non-recovery or specificity
+  fixes. Every GO match is reported as a candidate.
+- **Gene membership** comes from a different field: `target.go` (aspect P) instead of
+  `target.pathways`.
+
+The key qualitative finding to state: **GO describes processes, not disease pathways.** Only
+**0.3%** of GO labels carry any disease cue, so GO yields fewer and noisier matches than
+Reactome, concentrated on a handful of process-condition overlaps (inflammation, hypoxia,
+hypersensitivity). Consequence: the LLM judge rejected **24 of 77** low-confidence GO candidates
+(31%) versus **11 of 151** on Reactome (7%). On GO the judge is essential, not optional, and GO
+output should be treated as review-first rather than curation-ready.
+
+---
+
+## Slide 11 - Judge model comparison: Haiku, Sonnet, Opus
+
+**Message:** the deterministic core is reproducible; the judge is the one non-deterministic
+layer, so we measured three models against each other and against curated evidence.
+
+Reactome (151 low-confidence candidates judged):
+
+| Model | Rejects | False rejects vs curated evidence |
+| --- | ---: | ---: |
+| Haiku | 6 | 2 |
+| Sonnet (default) | 11 | 1 |
+| Opus | 8 | 1 |
+
+All three agree on **137/151 (91%)**. Disagreements fall on two ambiguous classes only:
+- **SARS-CoV-2 pathways matched to "severe acute respiratory syndrome"** via the alias `sars`.
+  SARS-CoV-2 causes COVID-19, not SARS, so rejecting is arguably more correct. Sonnet rejects
+  most of these; Haiku keeps almost all. Example: `SARS-CoV-2 Infection` -> SARS,
+  Haiku=keep, Sonnet=reject, Opus=keep.
+- **`hypoxia` as a molecular process vs the disease.** Sonnet and Opus reject
+  `Oxygen-dependent proline hydroxylation` -> hypoxia and `Regulation of gene expression by
+  hypoxia` -> hypoxia (HIF pathways); Haiku keeps them.
+
+GO (77 low-confidence candidates judged):
+
+| Model | Rejects |
+| --- | ---: |
+| Haiku | 37 |
+| Sonnet (default) | 24 |
+| Opus | 21 |
+
+All three agree on **60/77 (78%)**. Here the strictness order flips: **Haiku is strictest on
+GO**, Opus most lenient. The clearest disagreement, with the actual model reasons, worth showing
+verbatim on the slide:
+
+`cardiac muscle hypertrophy` matched to the disease `Skeletal muscle hypertrophy`
+(via the disease's exact synonym "Muscle hypertrophy"):
+- Haiku = **reject**: "cardiac muscle hypertrophy is distinct from skeletal muscle hypertrophy;
+  label specifies cardiac not skeletal"
+- Sonnet = **keep**: "hypertrophy sense matches, tissue site differs but not word sense"
+- Opus = **keep**: "same word sense; cardiac rather than skeletal tissue"
+
+This is a genuine judgement split: Haiku treats tissue specificity as disqualifying; Sonnet and
+Opus treat it as the same word sense with a different site. For disease-pathway curation Haiku's
+stricter reading is arguably better, but there is no GO baseline to settle it, which is the
+point: on GO, model choice is a real curation decision.
+
+Takeaways for the slide:
+- No model is uniformly strictest. Sonnet/Opus are stricter on Reactome's ambiguities
+  (SARS, hypoxia); Haiku is stricter on GO's tissue mismatches.
+- The real safeguard is not the model but the false-reject check against curated evidence, plus
+  human review of the retained reject list.
+
+### The case where the judge beat Open Targets' own mapping
+
+All three models rejected `Defective SLC1A3 causes episodic ataxia 6 (EA6)` ->
+`Isaacs syndrome`. This looks like a false reject against curated evidence, because Open Targets
+evidence contains that exact pair. But Open Targets' evidence made the same error: its
+`diseaseFromSource` was "episodic ataxia", mapped to Isaacs syndrome.
+
+Root cause, traced to the ontology: the EFO term **EFO_1000638** (Isaacs syndrome, which is
+neuromyotonia, dbXRefs DOID:963 / MESH:D020386 / Wikipedia:Neuromyotonia) carries
+**"episodic ataxia" as a spurious exact synonym**. Both our matcher and Open Targets' mapping
+followed that bad synonym; the judge caught it. The correct disease, hereditary episodic ataxia
+(MONDO_0016227), was kept for the same pathway.
+
+Point to land: the judge does more than filter label noise. It disambiguates and, as a
+byproduct, surfaces ontology data-quality errors that are actionable upstream. This is an EFO
+curation fix (editable at http://www.ebi.ac.uk/efo/EFO_1000638), and the judge's reject list is
+effectively a candidate list of such synonym errors.
+
+---
+
+## Slide 12 - Conclusion: benefits of integrating this pipeline
 
 **Message:** meaningful new evidence, from data already in Open Targets, with a method that
 generalises, and a demonstrated real-world need.
@@ -258,8 +367,9 @@ Points to land:
 2. **No new data required.** Everything comes from datasets Open Targets already ships (disease,
    target, reactome, evidence_reactome). This is recovering signal already present, not adding a
    new source.
-3. **Expandable to GO now.** The chunk index and whole_form/alias extractors are source-agnostic;
-   pointing them at GO biological-process labels is a configuration change, not a redesign.
+3. **Already extended to GO.** The pipeline runs on GO biological_process through the same code
+   (165 matches, 141 kept), with only the Reactome-specific layers switched off. This is the
+   universality claim, already demonstrated, not a promise.
 4. **Universal for future gene sets.** As Open Targets integrates new pathway or gene-set
    resources, the same pipeline applies with no method change. Only the template layer and the
    comparison baseline are source-specific.
@@ -283,15 +393,31 @@ Release: 26.06. Regenerate with `scripts/run_matcher.py` and `scripts/run_judge.
 
 - Diseases after filtering: 21,296 (from 47,080; dropped 25,049 measurement + 735 process).
 - Surface forms: 79,582. Distinct chunks: 249,260.
+
+Reactome:
 - Matcher output: 351 pairs (whole_form 171, alias 95, template 85).
-- Judge: 151 low-confidence candidates, 6 rejected, 345 kept.
+- Judge (Sonnet default): 151 low-confidence candidates, 11 rejected, 340 kept.
 - New pathway-disease links: 258, over 190 pathways and 175 diseases.
 - New target-disease pairs: 930 raw expansion, ~580 excluding pathways >50 genes. Present as
   "roughly 600 to 900". Median genes per new pathway = 1.
 - Recovery of curated evidence: 122/653 (18.7%): 88 exact, 28 more specific, 6 more general;
   531 not recovered.
 - Specificity improvements: 44.
-- Output files (CSV): matches.csv, matches_judged.csv, new_candidates.csv, specificity_fixes.csv
+
+GO biological_process:
+- Labels (non-obsolete): 24,136 of 30,874. Matches: 165 (whole_form 138, alias 27, template 0),
+  15 distinct diseases. Judge (Sonnet): 141 kept, 24 rejected. No curated baseline.
+- Only 0.3% of GO labels carry a disease cue.
+
+Judge model comparison (low-confidence candidates):
+- Reactome (151): Haiku 6 reject, Sonnet 11, Opus 8; agree 137/151 (91%). False rejects vs
+  curated evidence: Haiku 2, Sonnet 1, Opus 1.
+- GO (77): Haiku 37 reject, Sonnet 24, Opus 21; agree 60/77 (78%).
+- Ontology error caught: EFO_1000638 (Isaacs syndrome) has spurious exact synonym
+  "episodic ataxia"; all three models reject it, Open Targets evidence contains the same error.
+
+- Output files: matches_<source>.csv, matches_judged_<source>.csv, new_candidates_<source>.csv,
+  specificity_fixes_reactome.csv, and the unified disease_pathways_all.csv (source column), all
   in data/26.06/.
 
 Caveats to keep honest on the slides:
