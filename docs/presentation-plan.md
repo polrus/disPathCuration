@@ -289,6 +289,18 @@ output should be treated as review-first rather than curation-ready.
 **Message:** the deterministic core is reproducible; the judge is the one non-deterministic
 layer, so we measured three models against each other and against curated evidence.
 
+Model pricing (Anthropic API, USD per 1M tokens), for the cost/quality tradeoff:
+
+| Model | Input $/1M | Output $/1M |
+| --- | ---: | ---: |
+| Claude Haiku 4.5 | 1.00 | 5.00 |
+| Claude Sonnet 5 (default) | 3.00 (2.00 intro to 2026-08-31) | 15.00 (10.00 intro) |
+| Claude Opus 4.8 | 5.00 | 25.00 |
+
+The judge tier is small (151 + 77 candidates, batched, cached), so absolute cost is low at any
+model; the point of the table is the ~5x span from Haiku to Opus when this scales to more
+sources or every release.
+
 Reactome (151 low-confidence candidates judged):
 
 | Model | Rejects | False rejects vs curated evidence |
@@ -415,6 +427,8 @@ Judge model comparison (low-confidence candidates):
 - GO (77): Haiku 37 reject, Sonnet 24, Opus 21; agree 60/77 (78%).
 - Ontology error caught: EFO_1000638 (Isaacs syndrome) has spurious exact synonym
   "episodic ataxia"; all three models reject it, Open Targets evidence contains the same error.
+- Model pricing (USD per 1M tokens, input / output): Haiku 4.5 1.00 / 5.00; Sonnet 5 (default)
+  3.00 / 15.00 (intro 2.00 / 10.00 to 2026-08-31); Opus 4.8 5.00 / 25.00.
 
 - Output files: matches_<source>.csv, matches_judged_<source>.csv, new_candidates_<source>.csv,
   specificity_fixes_reactome.csv, and the unified disease_pathways_all.csv (source column), all
