@@ -3,7 +3,7 @@
 A 10-minute talk. Detailed slide-by-slide description with the numbers and examples to use.
 All figures are from Open Targets Platform release 26.06. Build the deck from this later.
 
-Target length: ~13 slides, roughly 1 minute each. Numbers in **bold** are the headline figures
+Target length: ~15 slides, roughly 1 minute each. Numbers in **bold** are the headline figures
 for that slide.
 
 ---
@@ -368,7 +368,84 @@ effectively a candidate list of such synonym errors.
 
 ---
 
-## Slide 12 - Conclusion: benefits of integrating this pipeline
+## Slide 12 - Scaling out: all public pathway libraries via Enrichr
+
+**Message:** the same pipeline applied to the whole landscape of public pathway libraries, not
+just Open Targets. This is the universality claim taken to its full extent.
+
+How the libraries were chosen:
+- Enrichr catalogs **228 gene-set libraries**. We took the curated Pathways category, the
+  latest version of each library, and excluded Reactome and GO (already covered via Open
+  Targets) and mouse variants (mouse gene symbols do not map to human targets). Result:
+  **12 libraries**.
+- Key practical advantage: each Enrichr library ships term labels **and** gene sets in one GMT
+  file, so gene membership is free, with no target-to-pathway join. Gene symbols are HGNC,
+  already compatible with the pipeline's gene-symbol filter.
+
+The 12 libraries (what each is):
+
+| Library | What it is |
+| --- | --- |
+| KEGG_2026 | Kyoto Encyclopedia of Genes and Genomes; curated metabolic, signalling and human-disease pathways |
+| WikiPathways_2024_Human | community-curated biological pathways |
+| Elsevier_Pathway_Collection | commercially curated disease-mechanism and signalling pathways (Pathway Studio) |
+| BioPlanet_2019 | NCATS BioPlanet; integrated, deduplicated collection of human pathways |
+| BioCarta_2016 | legacy hand-drawn signalling pathway maps |
+| NCI-Nature_2016 | NCI-Nature Pathway Interaction Database; curated signalling pathways |
+| Panther_2016 | PANTHER classification-system pathways |
+| HumanCyc_2016 | curated human metabolic pathways (MetaCyc/HumanCyc) |
+| PFOCR_Pathways_2023 | Pathway Figure OCR; gene sets mined from published figures |
+| MSigDB_Hallmark_2020 | 50 hallmark gene sets summarising coherent biological states |
+| MSigDB_Computational | computationally derived cancer gene modules |
+| MSigDB_Oncogenic_Signatures | gene sets from oncogenic pathway perturbations |
+
+---
+
+## Slide 13 - Enrichr results: disease pathways found across libraries
+
+**Message:** one deterministic pass plus the judge, across 12 libraries, yields a large curated
+candidate set, and the extraction itself taught us where label matching does and does not apply.
+
+Numbers:
+- **1,144 disease-pathway matches** before the judge, **1,118 kept** after (26 rejected, **2.3%**).
+- **349 distinct diseases**, expanding to **~36,700 deduplicated target-disease pairs**.
+- The 2.3% reject rate is Reactome-like (low), not GO-like (31%). These libraries use proper
+  disease-named labels, not process descriptions, which confirms the source-type distinction:
+  the judge matters most where labels describe processes.
+
+Per library (judge-kept), one example each:
+
+| Library | Kept | Target-disease | Example |
+| --- | ---: | ---: | --- |
+| Elsevier | 737 | 19,208 | "Oxidative Stress in Amyotrophic Lateral Sclerosis" -> ALS |
+| WikiPathways | 179 | 8,648 | "Smith-Magenis and Potocki-Lupski Syndrome" -> Potocki-Lupski syndrome |
+| KEGG | 88 | 10,874 | "Arrhythmogenic right ventricular cardiomyopathy" -> ARVC |
+| BioPlanet | 91 | 4,249 | "APOBEC3G-mediated resistance to HIV-1" -> HIV-1 infection |
+| BioCarta | 13 | 258 | "Reversal of Insulin Resistance by Leptin" -> insulin resistance |
+| Panther | 5 | 374 | "Parkinson disease" -> Parkinson disease |
+| NCI-Nature | 3 | 101 | "HIV-1 Nef: negative effector of Fas" -> HIV infectious disease |
+| MSigDB_Hallmark | 2 | 400 | "Inflammatory Response" -> inflammation |
+
+What the extraction taught us (lessons):
+- **The biggest library is not label-matchable.** PFOCR (21,845 terms) yields zero: its terms
+  are PMC figure IDs (`PMC102186 F9`), not pathway names. Label matching simply does not apply.
+- **Metabolic and module libraries name no diseases.** HumanCyc (metabolic) and MSigDB
+  Computational/Oncogenic (gene-module IDs) also yield zero, correctly.
+- **Disease-mechanism libraries dominate.** Elsevier alone contributes 737 of the 1,118 kept,
+  because its naming convention is "X in Disease Y".
+- **Gene membership came for free** from the GMT files, unlike Open Targets where it required a
+  target-to-pathway join.
+- **The judge caught subtle context errors** the string matcher cannot: protein names (CFTR,
+  DSCAM, hypoxia-inducible factor), word senses (long-term depression, sterile inflammation,
+  glutamate overdose), and SARS-CoV-2 versus SARS.
+
+Take-away for the slide: the pipeline generalises to any labelled pathway resource, and the
+same source-type rule holds everywhere: named-disease labels are high-yield and low-noise;
+process or identifier labels are not.
+
+---
+
+## Slide 14 - Conclusion: benefits of integrating this pipeline
 
 **Message:** meaningful new evidence, from data already in Open Targets, with a method that
 generalises, and a demonstrated real-world need.
@@ -379,9 +456,10 @@ Points to land:
 2. **No new data required.** Everything comes from datasets Open Targets already ships (disease,
    target, reactome, evidence_reactome). This is recovering signal already present, not adding a
    new source.
-3. **Already extended to GO.** The pipeline runs on GO biological_process through the same code
-   (165 matches, 141 kept), with only the Reactome-specific layers switched off. This is the
-   universality claim, already demonstrated, not a promise.
+3. **Already extended to GO and 12 public pathway libraries.** The pipeline runs on GO
+   biological_process (165 matches, 141 kept) and on 12 curated Enrichr libraries (1,118 kept,
+   ~36,700 target-disease pairs) through the same code, with only the Reactome-specific layers
+   switched off. This is the universality claim, demonstrated across providers, not a promise.
 4. **Universal for future gene sets.** As Open Targets integrates new pathway or gene-set
    resources, the same pipeline applies with no method change. Only the template layer and the
    comparison baseline are source-specific.
