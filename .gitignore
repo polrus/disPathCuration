@@ -222,3 +222,11 @@ __marimo__/
 
 # Downloaded Open Targets data
 data/
+
+# macOS
+.DS_Store
+
+# presentation build
+presentation/node_modules/
+presentation/ql/
+presentation/~$*
