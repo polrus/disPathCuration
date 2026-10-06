@@ -27,7 +27,8 @@ const C = {
 // of runs; the lone Trebuchet MS title slide is an anomaly, not the house style):
 const TITLE_FONT = 'Roboto'; // slide titles/section headers/big numbers — use bold:true
 const BODY_FONT = 'Roboto';  // body copy, captions, meta, labels
-const LABEL_FONT = 'Roboto Medium'; // labels, kickers, sub-heads (embed this weight too)
+const LABEL_FONT = 'Roboto Medium';
+const SLIDE_TITLE_FONT = 'Trebuchet MS'; // slide titles only
 
 const WORDMARK = path.join(ASSETS, 'ot-wordmark.png');        // colour, on light bg
 const WORDMARK_WHITE = path.join(ASSETS, 'ot-wordmark-white.png'); // white, on navy bg
@@ -59,7 +60,7 @@ function contentTitle(slide, title, opts = {}) {
   const k = opts.kicker;
   if (k) kicker(slide, k, 0.6, 0.5);
   slide.addText(title, {
-    x: 0.6, y: k ? 0.86 : 0.55, w: 12.1, h: 1.05, fontFace: TITLE_FONT, fontSize: opts.fontSize || 36,
+    x: 0.6, y: k ? 0.86 : 0.55, w: 12.1, h: 1.05, fontFace: SLIDE_TITLE_FONT, fontSize: opts.fontSize || 36,
     bold: true, color: C.navy, valign: 'top', lineSpacing: 36,
   });
 }
@@ -121,7 +122,7 @@ function titleSlide(pres, { title, meta = [] }) {
   s.addImage({ path: TITLE_BG, x: 0, y: 0, w: W, h: H }); // full-bleed diagonal bg
   s.addImage({ path: WORDMARK, x: 0.6, y: 0.5, w: 2.0, h: 2.0 / WM_AR }); // top-left mark
   s.addText(title, {
-    x: 0.85, y: 2.4, w: 6.6, h: 2.6, fontFace: TITLE_FONT, fontSize: 36, bold: true,
+    x: 0.85, y: 2.4, w: 6.6, h: 2.6, fontFace: SLIDE_TITLE_FONT, fontSize: 36, bold: true,
     color: C.navy, valign: 'top', lineSpacing: 42,
   });
   if (meta.length) {
@@ -145,7 +146,7 @@ function sectionDivider(pres, { part, title }) {
     color: C.blue, charSpacing: 2, valign: 'middle',
   });
   s.addText(title, {
-    x: 0.58, y: cy + 0.55, w: 6.8, h: 2.4, fontFace: TITLE_FONT, fontSize: 44, bold: true,
+    x: 0.58, y: cy + 0.55, w: 6.8, h: 2.4, fontFace: SLIDE_TITLE_FONT, fontSize: 44, bold: true,
     color: C.navy, valign: 'top', lineSpacing: 48,
   });
   addLogo(s, 'light');
@@ -189,7 +190,7 @@ function columns(pres, { title, kicker: kick, cols }) {
     const x = mx + i * (colW + gap);
     // card panel
     s.addShape('roundRect', { x, y: cardY, w: colW, h: cardH, rectRadius: 0.06,
-      fill: { color: 'F4F6F9' }, line: { color: 'E4E9F0', width: 1 } });
+      fill: { color: 'F4F6F9' }, line: { type: 'none' } });
     const padX = 0.35;
     let cy = cardY + 0.4;
     if (c.chip !== undefined) {
@@ -342,7 +343,7 @@ function schemaSlide(pres, { title, ref }) {
   s.addShape('rect', { x: 0, y: 0, w: W, h: 1.05, fill: { color: C.navy }, line: { type: 'none' } });
   s.addShape('rect', { x: 0, y: 1.05, w: W, h: 0.06, fill: { color: C.blue }, line: { type: 'none' } });
   s.addText(title, {
-    x: 0.6, y: 0, w: 11.5, h: 1.05, fontFace: TITLE_FONT, fontSize: 28, bold: true,
+    x: 0.6, y: 0, w: 11.5, h: 1.05, fontFace: SLIDE_TITLE_FONT, fontSize: 28, bold: true,
     color: C.paper, align: 'left', valign: 'middle',
   });
   if (ref) footer(s, ref);
@@ -364,7 +365,7 @@ function schemaFlow(pres, { title, ref, stages }) {
   stages.forEach((st, i) => {
     const x = mx + i * (laneW + gap);
     s.addShape('roundRect', { x, y: bodyY, w: laneW, h: bodyH, rectRadius: 0.06,
-      fill: { color: 'F4F6F9' }, line: { color: 'E4E9F0', width: 1 } });
+      fill: { color: 'F4F6F9' }, line: { type: 'none' } });
     node(s, { x, y: headY, w: laneW, h: headH, label: st.label, fill: st.fill || C.blue });
     if (i < n - 1) arrow(s, x + laneW, headY + headH / 2, x + laneW + gap, headY + headH / 2);
 
@@ -454,13 +455,35 @@ function table(slide, o) {
       }
     });
   });
-  // outer hairline
-  const totalH = headH + 0.05 + rows.length * rowH;
-  slide.addShape('rect', { x, y, w, h: totalH, fill: { type: 'none' }, line: { color: 'D9DEE6', width: 0.75 } });
   return bodyY + rows.length * rowH;
 }
+
+// Rounded label with no stroke. The deck's basic infographic atom: an ontology
+// term, a label fragment, a verdict. Verdict colours: VERDICT.keep / .reject /
+// .none.
+function pill(slide, o) {
+  slide.addShape('roundRect', { x: o.x, y: o.y, w: o.w, h: o.h || 0.34, rectRadius: 0.08,
+    fill: { color: o.fill || C.blue30 }, line: { type: 'none' } });
+  slide.addText(o.text, { x: o.x, y: o.y, w: o.w, h: o.h || 0.34, margin: 2,
+    fontFace: o.font || BODY_FONT, fontSize: o.fontSize || 12, bold: o.bold || false,
+    color: o.color || C.navy, align: o.align || 'center', valign: 'middle' });
+}
+
+// Flat panel, no outline. Structure comes from fill contrast, never a border.
+function card(slide, o) {
+  slide.addShape('roundRect', { x: o.x, y: o.y, w: o.w, h: o.h, rectRadius: 0.06,
+    fill: { color: o.fill || 'F4F6F9' }, line: { type: 'none' } });
+}
+
+// Fixed verdict palette, so a reader learns the colours once.
+const VERDICT = {
+  keep: { fill: 'DDF0E2', color: '1E6B33' },
+  reject: { fill: C.red30, color: 'A33224' },
+  none: { fill: 'D5DAE2', color: C.grey },
+};
 
 module.exports = { C, TITLE_FONT, BODY_FONT, W, H, WORDMARK, WORDMARK_WHITE, TITLE_BG,
   addLogo, diagonal, footer, titleSlide, sectionDivider, bigStat, columns,
   schemaSlide, schemaFlow, table, node, chip, arrow, coralBox, prosCons, roadmap,
-  kicker, contentTitle, pageNum, LABEL_FONT, EMOJI };
+  kicker, contentTitle, pageNum, LABEL_FONT, SLIDE_TITLE_FONT, EMOJI,
+  pill, card, VERDICT };
